@@ -3,5 +3,5 @@
 /dist/
 /tmp/
 /web/templates
-/bin/
+# /bin/
 node_modules/

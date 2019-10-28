@@ -1,0 +1,40 @@
+steps:
+  - label: "test_and_build"
+    commands:
+      - make -C web test
+    plugins:
+      - docker#v3.0.1:
+          always-pull: true
+          image: replicated/gitops-builder:buildkite
+          workdir: /repo
+    artifact_paths:
+      - "web/**/*"
+      # - "build/**/*"
+
+  - wait
+
+  - commands:
+      # - mkdir -p dist
+      # - buildkite-agent artifact download dist/* . --step test_and_build
+      - make upload-dist-staging
+    # branches: master
+
+  - commands:
+      - make upload-dist-production
+    branches: master
+
+  - commands:
+      - make util-image
+#    branches: master
+
+  - commands:
+      - mkdir -p web
+      - buildkite-agent artifact download web/* . --step test_and_build
+      # - mkdir -p build
+      # - buildkite-agent artifact download build/* . --step test_and_build
+      - make build-staging
+    # branches: master
+
+  - commands:
+      - make build-production
+    branches: master

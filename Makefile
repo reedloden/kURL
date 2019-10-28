@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 KURL_UTIL_IMAGE := replicated/kurl-util:latest
+PROJECT_NAME ?= kurl
 
 .PHONY: clean
 clean:
@@ -127,7 +128,7 @@ build/upgrade.sh:
 	sed -n '/# Magic end/,$$p' scripts/upgrade.sh | sed '1d' >> tmp/upgrade.sh
 	mv tmp/upgrade.sh build/upgrade.sh
 	chmod +x ./build/upgrade.sh
-	
+
 build/templates/upgrade.tmpl: build/upgrade.sh
 	mkdir -p build/templates
 	sed 's/^KUBERNETES_VERSION=.*/KUBERNETES_VERSION="{{= KUBERNETES_VERSION }}"/' "build/upgrade.sh" | \
@@ -248,3 +249,38 @@ watchrsync:
 .PHONY: kurl-util-image
 kurl-util-image:
 	docker build -t replicated/kurl-util -f deploy/kurl-util/Dockerfile .
+
+.PHONY: upload-dist-staging
+upload-dist-staging: export AWS_PROFILE=replicated-staging
+upload-dist-staging: export S3_BUCKET=kurl-sh-staging
+upload-dist-staging: upload-dist
+
+.PHONY: upload-dist-production
+upload-dist-production: export AWS_PROFILE=replicated-production
+upload-dist-production: export S3_BUCKET=kurl-sh
+upload-dist-production: upload-dist
+
+.PHONY: upload-dist
+upload-dist:
+	bin/upload-dist.sh
+
+.PHONY: upload
+util-image:
+	docker build -t replicated/kurl-util -f deploy/kurl-util/Dockerfile .
+	docker push replicated/kurl-util
+
+.PHONY: build-staging
+build-staging: REGISTRY = 923411875752.dkr.ecr.us-east-1.amazonaws.com
+build-staging: build_and_push
+
+.PHONY: build-production
+build-production: REGISTRY = 799720048698.dkr.ecr.us-east-1.amazonaws.com
+build-production: build_and_push
+
+.PHONY: build_and_push
+build_and_push:
+	docker build -f ./deploy/Dockerfile-slim \
+		--build-arg version=$${BUILDKITE_COMMIT:0:7} \
+		-t ${REGISTRY}/${PROJECT_NAME}:$${BUILDKITE_COMMIT:0:7} \
+		.
+	docker push ${REGISTRY}/${PROJECT_NAME}:$${BUILDKITE_COMMIT:0:7}
